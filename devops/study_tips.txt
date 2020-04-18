@@ -1,0 +1,1602 @@
+## PUPPET LECTURE
+
+The puppet software is declarative NOT inperative like regular scripts. This means you don't have to tell it how to get to it's destination, just specify the destination and it does the rest. Can use the analogy of taking a cab to get to a destination unlike driving to the destination yourself.
+
+No connection without signed certificate from master to agent. This is secured https request
+
+The requirements are 
+
+1. Master (server)
+2. Agent (clients)
+3. Certificate
+4. Sockets (port 8140)
+5. Manifest (site.pp, nodes.pp)
+6. Resources (packages, services, files, directories, users, groups)
+7. Classes (sites.pp)
+8. Facter (Collects systems information)
+9. Roles (Groups the profiles or codes)
+10. Profile (codes)
+
+1. Installation
+2. Configuration
+3. Administration
+
+# MASTER (Server)
+
+RHEL/CentOS 7
+rpm -ivh http://yum.puppetlabs.com/puppetlabs-release-el-7.noarch.rpm
+
+RHEL/CentOS 6
+rpm -ivh http://yum.puppetlabs.com/puppetlabs-release-el-6.noarch.rpm
+
+RHEL/CentOS 5
+rpm -ivh http://yum.puppetlabs.com/puppetlabs-release-el-5.noarch.rpm
+
+# Install the required packages
+yum install puppet puppet-server facter
+
+# Open the firewall ports for 8140
+iptables -I INPUT -p tcp -m state --state NEW --dport 8140 -j ACCEPT
+iptables -L
+or
+firewall-cmd --add-port=8140/tcp --permanent
+firewall-cmd --reload
+
+# Make the port persistent
+cat /etc/sysconfig/iptables
+# Firewall configuration written by system-config-firewall
+# Manual customization of this file is not recommended.
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A INPUT -p icmp -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+-A INPUT -p udp -m state --state NEW --dport 23 -j ACCEPT
+-A INPUT -p tcp -m state --state NEW --dport 23 -j ACCEPT
+-A INPUT -p tcp -m state --state NEW --dport 8140 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT
+-A INPUT -j REJECT --reject-with icmp-host-prohibited
+-A FORWARD -j REJECT --reject-with icmp-host-prohibited
+COMMIT
+
+service iptables restart
+
+ls -l /var/lib/puppet/ssl/
+
+service puppetmaster status
+service puppetmaster start
+service puppetmaster status
+
+ls -l /var/lib/puppet/ssl/
+
+# Set to enable on boot up
+chkconfig | grep puppetmaster
+chkconfig puppetmaster on
+
+# Modify the configuration file
+cat >> /etc/puppet/puppet.com
+[main]
+certname = master.example.com 
+server = master.example.com
+
+# Restart puppet services after configuration change
+systemctl restart pupperserver
+or
+service puppetserver restart
+
+# Confirm and sign agents certificates
+puppet cert list --all 
+puppet cert sign agent
+
+# Certification options
+puppet cert list  (list certs)
+puppet cert list --all (list all certs)
+puppet cert sign agent (sign certs)
+puppet cert clean (clean certs)
+puppet cert generate (generate certs)
+
+Or to directly modify resources:
+
+puppet resource service httpd ensure=running enable=true
+
+# Auto certification of agents
+cat >>  /etc/puppet/autosign.conf 
+*.example.com
+
+# Add entries to the manifests
+/etc/puppet/manifests/sites.pp (import nodes.pp)
+/etc/puppet/manifests/nodes.pp (add agent's name and resources)
+
+# Restart puppet services
+service puppetserver restart
+systemctl restart puppetserver
+
+or
+
+# Validate, dry run and execute
+puppet parser validate nodes.pp
+puppet apply nodes.pp --noop
+puppet apply nodes.pp 
+
+# AGENT (Client)
+
+RHEL/CentOS 7
+rpm -ivh http://yum.puppetlabs.com/puppetlabs-release-el-7.noarch.rpm
+
+RHEL/CentOS 6
+rpm -ivh http://yum.puppetlabs.com/puppetlabs-release-el-6.noarch.rpm
+
+RHEL/CentOS 5
+rpm -ivh http://yum.puppetlabs.com/puppetlabs-release-el-5.noarch.rpm
+
+yum install puppet facter
+
+cat /etc/sysconfig/iptables
+# Firewall configuration written by system-config-firewall
+# Manual customization of this file is not recommended.
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A INPUT -p icmp -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+-A INPUT -p udp -m state --state NEW --dport 23 -j ACCEPT
+-A INPUT -p tcp -m state --state NEW --dport 23 -j ACCEPT
+-A INPUT -p tcp -m state --state NEW --dport 8139 -j ACCEPT
+-A INPUT -m state --state NEW -m tcp -p tcp --dport 22 -j ACCEPT
+-A INPUT -j REJECT --reject-with icmp-host-prohibited
+-A FORWARD -j REJECT --reject-with icmp-host-prohibited
+COMMIT
+
+service iptables restart
+
+# Modify the configuration file
+cat >> /etc/puppetlabs/puppet/puppet.com
+[main]
+certname = agent.example.com 
+server = master.example.com
+
+# Restart puppet services after configuration change
+systemctl restart pupperserver
+or
+service puppetserver restart
+
+# Requests certificate from server 
+puppet agent --test --server=master_server
+puppet agent -t
+puppet agent -tv
+
+# CERTIFICATION ISSUE
+
+Agent
+rm -rf /var/lib/puppet/ssl/*
+puppet agent -t
+
+Master 
+puppet cert list --all
+puppet cert --allow-dns-alt-names sign agent
+puppet cert list --all
+
+# If /var/lib/puppet/ssl/* is empty on master
+service puppetmaster restart
+or
+systemctl restart puppetmaster
+
+# CRITICAL FILES 
+
+/var/log/puppetlabs/puppet/puppet.log (captures log files)
+/etc/puppet/puppet.conf (opensource master configuration on client)
+/etc/puppetlabs/puppet/puppet.conf (puppet enterprise master on client)
+/home/user/puppet/puppet.conf (normal user can be placed on home directory)
+/etc/puppet/manifests/nodes.pp (client resources on master)
+
+# TUTORIAL WEBSITE
+
+https://www.puppetcookbook.com/posts/install-package.html
+
+https://www.example42.com/tutorials/PuppetTutorial/
+
+https://sites.google.com/site/mrxpalmeiras/puppet/puppet-cheat-sheet
+
+# USING CLASS & INCLUDES METHOD
+
+MASTER (Server)
+
+## Make sure all classes are in lowercase NOT uppercase
+
+cat >> /etc/puppet/manifest/all_test.pp
+
+class ntp {
+  package { 'ntp':
+  ensure => 'present',
+  # enable => 'true',
+}
+
+  file { '/etc/ntp.conf':
+  ensure  => 'present',
+  content => 'server 0.centos.pool.ntp.org',
+}
+
+  service { 'ntpd':
+  ensure => 'running',
+  }
+}
+
+class user {
+  user { 'ironman':
+  ensure     => 'present',
+  comment    => 'ironman',
+  home       => '/home/ironman',
+  managehome => 'true',
+  password   => 'test',
+  }
+}
+
+class cron {
+  cron { 'myscript':
+  command => '/home/sadekunb/test.sh',
+  user    => 'root',
+  minute  => '30',
+  hour    => '12',
+  }
+}
+
+class vsftp {
+  package { 'vsftpd':
+  ensure => 'present',
+  }
+}
+
+class motd {
+  file { '/etc/motd':
+  content => "This is puppet master\n",
+  }
+}
+
+class multi_Packages {
+  $packages = ['vim', 'git', 'curl']
+  package { $packages:
+  ensure => 'installed'
+  }
+}
+
+class hello_file {
+  file { '/tmp/hello':
+  content => "Hello, world\n",
+  }
+}
+
+class notify  {
+  notify { '/tmp/my_file':
+  message => 'My file is present',
+  }
+}
+
+class create_testfile {
+  file { '/tmp/testfile.txt':
+  ensure  => present,
+  mode    => '0644',
+  replace => false,
+  content => "holy cow!\n",
+  }
+}
+
+class conditional_statement {
+  if $OperatingSystem != 'Linux' {
+  warning('This manifest is not supported on this other OS apart from linux.')
+  } else {
+  notify { 'the OS is Linux. We are good to go!': }
+  }
+}
+
+class case_flavour {
+  case $operatingsystem {
+  centos, redhat: { $service_name = 'ntpd' }
+  debian, ubuntu: { $service_name = 'ntp' }
+  default: { $service_name = 'unknown' }
+  }
+}
+
+class directories {
+  # create a directory
+  file { '/etc/site-conf':
+  ensure => 'directory',
+}
+  # a fuller example, including permissions and ownership
+  file { '/var/log/admin-app-log':
+  ensure => 'directory',
+  owner  => 'root',
+  group  => 'wheel',
+  mode   => '0750',
+  }
+}
+
+class basic_yum_repo {
+  # configure the repo we want to use
+  yumrepo { 'company_app_repo':
+  enabled  => 1,
+  descr    => 'Local repo holding company application packages',
+  baseurl  => 'http://repos.example.org/apps',
+  gpgcheck => 0,
+  }
+}
+
+class exec {
+  exec { 'start_mysql':
+  command => '/etc/init.d/mysql start'
+  }
+}
+
+class ssh {
+  service { 'sshd':
+  ensure  => 'running',
+  enable  => true,
+  require => Package['openssh-server'],
+  }
+
+  # add a notify to the file resource
+  file { '/etc/ssh/sshd_config':
+  notify  => Service['sshd'], # this sets up the relationship
+  mode    => '0600',
+  owner   => 'root',
+  group   => 'root',
+  require => Package['openssh-server'],
+  content => template('ssh/sshd_config.erb'),
+  }
+}
+
+class user_password {
+  user { 'mcfakey':
+  ensure   => 'present',
+  password => '$1$9VC1vFFa$GHKWgtdODti8eKqkQ7Ruv.'
+  }
+}
+
+cat >> /etc/puppet/manifest/site.pp
+
+import "all_test.pp"
+ 
+node "centos6.example.com" {
+	include "ntp"
+	include "user"
+	include "cron"
+	include "vsftp"
+	include "motd"
+}
+node "centos7.example.com" {
+	include "multi_packages"
+	include "hello_file"
+	include "create_testfile"
+	include "conditional_statement"
+	include "case_flavour"
+	include "directories"
+
+}
+node "vpn-vm.example.com" {
+	include "ntp"
+	include "user"
+	include "cron"
+	include "vsftp"
+	include "motd"
+	include "multi_packages"
+	include "hello_file"
+	include "create_testfile"
+	include "conditional_statement"
+	include "case_flavour"
+	include "directories"
+	include "exec"
+	include "user_password"
+	include "basic_yum_repo"
+}
+
+# Execute from master 
+puppet parser validate site.pp
+puppet apply site.pp --noop
+puppet apply site.pp
+
+## ANSIBLE LECTURE
+
+https://willthames.github.io/devops-singapore-2016/01-intro.html
+
+Ansible Tower (Web based user interface) - TIP
+
+-Template (Playbooks)
+-Inventories (Shows sync'd inventories from the gitlab for adhoc or playbook)
+-Projects (Sync from gitlab)
+
+1. Host inventory 
+2. Playbook -implemented tasks
+3. SSH Trust -Create trusted ssh access
+
+# CREATE TRUSTED SSH
+
+ssh-keygen -t dsa
+ssh-copy-id -i .ssh/id_rsa.pub user@host.example.com
+ssh host.example.com
+
+# INSTALL ANSIBLE
+
+yum install epel-release
+yum install ansible
+rpm -qa | grep ansible
+ansible --version
+
+# POPULATE HOSTS INVENTORY
+
+cat > /etc/ansible/hosts
+
+[web]
+192.168.22.10
+192.168.22.11
+
+[database]
+192.168.22.12
+192.168.22.13
+
+[apache]
+192.168.22.14
+192.168.22.15
+
+[nginx]
+192.168.22.16
+192.168.22.17
+
+# CONFIGURATION FILE
+
+/etc/ansible/ansible.cfg
+
+# SWITCHES
+
+-m (modules)
+-u (user)
+-i (inventory)
+-s (sudo)
+-m (use ping module eg -m ping)
+-k (ask for password)
+-b (sudo access)
+-a (arguments or commands)
+
+Preloaded with module 
+Hosts inventory 
+Modules/Tasks
+Plays 
+Playbooks
+Manual V Scripts 
+
+# MODULE INCLUDES 
+
+1. apt/yum
+2. copy 
+3. ec2
+4. file 
+5. service 
+6. template 
+7. user 
+8. get_url
+9. git
+10. ping 
+etc
+
+# MODULE TYPES 
+
+https://docs.ansible.com/ansible/latest/modules/modules_by_category.html
+
+1. Command 
+2. Shell
+3. Script
+4. Raw 
+
+MAUI (modules, commands, user, inventory)
+
+m (modules)
+a (arguments or command)
+u (user)
+i (inventory)
+
+# Check all servers 
+ansible all -m ping 
+
+# Check uptime of all servers
+ansible web -m command -a "uptime" 
+
+# Checking facts on local machines
+ansible localhost -m setup 
+ansible all -i hosts -u vagrant -m ping 
+ansible all -i hosts -u vagrant -m setup
+
+# Install apache on web servers 
+ansible web -i hosts -u vagrant -m yum -a "name=httpd state=present" -b 
+
+# Remove apache on web servers
+ansible web -i hosts -u vagrant -m yum -a "name=httpd state=absent" -b 
+
+# List all tasks in the playbook
+ansible-playbook playbook.yml --list-tasks
+
+# Start play from a particular task 
+ansible-playbook playbook.yml --start-at-task="task name"
+
+# Check the play step by step with interactive way. This will prompt the user for to confirm each task before running
+ansible-playbook playbook.yml --step
+
+# Check syntax of the playbook
+ansible-playbook playbook.yml --syntax-check
+
+# Execute the playbook in the check (dry-run) mode which check what changes will be performed
+ansible-playbook playbook.yml --check
+
+# List hosts on which playbook will be executed
+ansible-playbook playbook.yml --list-hosts -l subset 
+
+# List tags in the playbook
+ansible-playbook playbook.yml --list-tags
+
+# Only run plays and tasks tagged with these tag values
+ansible-playbook playbook.yml --tags, tag1, tag2...tagN
+
+# Skip the tasks associated with specific tasks 
+ansible-playbook playbook.yml --skip-tags tag1,tag2...tagN
+
+# The --forks what lets ansible run on multiple hosts in parallel. NUM is specified as in integer, the default is 5
+ansible-playbook playbook.yml --forks=NUM
+
+# Run a playbook on the target hosts without inventory files
+ansible-playbook playbook.yml -i [IP | ServerName]. 
+
+# Yum updates on all web servers
+ansible-playbook web -a "yum update -y"
+
+# Transfer file test.txt to all systems in labsystems group
+ansible-playbook web -m copy -a "src=/root/test.txt dest=/root/test.txt"
+
+# Create a user john with password john123 on all systems
+ansible-playbook all -m user -a "name=john password="
+
+# Ping specific node
+ansible -i hosts nycweb01.prod.local -m ping
+
+# Ping with wildcard
+ansible -i hosts "nycweb*" -m ping
+
+# Ping all nodes with SSH user 'root'
+ansible -i hosts all -m ping -u root
+
+# INDENTATION TIPS: 
+
+Can use the website below for indentation purpose
+
+https://editor.swagger.io/
+
+1. Try and start with following format of 331
+
+---
+- hosts: 
+   become: true
+   remote_user: root
+   gather_facts: no 
+   var:
+   tasks:
+        - group: name=admin state=present
+        - user: name=sysman comment="Sys Admin" group=admin
+        - user: name=spiderman comment="Marvel Comic" group=admin
+        - file: path=/opt/tools state=directory owner=sysman mode=0755
+        - file: dest=/var/tmp/sammy_man state=directory
+        - file: path=/etc/ansible/yaml/samuel_testing state=touch
+        - yum: name=httpd state=latest
+        - yum: name=nginx state=installed
+        - yum: name=* state=latest
+        - yum: name=php-cli state=present update_cache=yes
+        - service: name=nginx state=running
+        - service: name=nginx state=restarted
+        - service: name=httpd state=started enabled=yes
+        - uri: url=https://wordpress.org/latest.zip.sha1 return_content=true register=wp_checksum
+        - get_url: url=https://wordpress.org/latest.zip dest=/tmp/wordpress.zip checksum="sha1:{{wp_checksum.content}}"
+        - unarchive: src=/tmp/wordpress.zip dest=/tmp copy=no creates=/tmp/wordpress/wp-settings.php
+        - template: src=/etc/hosts dest=/etc/ansible/yaml/hosts
+        - copy: src=/etc/hosts.allow dest=/etc/ansible/yaml/hosts.allow
+        - command: getenforce
+        - shell: service httpd start && chkconfig httpd on
+        - mysql_db: name=wordpress state=present
+        - yum: name={{item}} state=installed
+           with_items:
+               - php
+               - php-frm
+               - php-mysql
+               - php-xml
+
+or
+
+---
+- hosts: 
+   become: true
+   remote_user: root
+   gather_facts: no 
+   var:
+   tasks:
+       - name: description...
+          yum: 
+               command: 
+          service: 
+              command:
+          template:
+               command:
+          group:
+              command..
+          user:
+              command:     
+          with_items:
+               -packages
+          notify:
+                -restart
+          copy: 
+               when:
+          get_url:
+     file: 
+     user:  
+     authorized_key:
+     content:
+     action:
+     state:
+     register: 
+     prompt
+     etc....
+
+##  Ansible samples... 
+
+- name: daily tasks
+  hosts: all_servers
+  remote_user: root
+  become: 'yes'
+  tasks: null
+
+- name: create group admin
+  group: name=admin state=present
+
+- name: create user sysman
+  user: name=sysman shell=/bin/bash comment="Sys Admin" group=admin
+
+- name: change permission
+  file: path=/opt/tools state=directory owner=sysman mode=0755
+
+- name: install latest apache package
+  yum: name=httpd state=latest
+
+- name: implement yum upgrade
+  yum: name=* state=latest
+
+- name: enable yum services on boot up
+  service: name=httpd state=started enabled=yes
+
+- name: create file called samuel_testing
+  file: path=/etc/ansible/yaml/samuel_testing state=touch
+
+- name: copy files
+  copy: src=/etc/hosts.allow dest=/etc/ansible/yaml/hosts.allow
+
+- name: install mysql-server (install package)
+  mysql_user: 'name=demo password=demo priv=demo.*:ALL host=''%'' st ate=present'
+
+- name: test to see SELinux is running (confirm service running)
+  command: getenforce
+  register: sestatus
+  changed-when: false
+
+- name: configure selinux to allow httpd to connect to remote database
+  seboolean: name=httpd_can_network_connect_db state=true persistent=yes
+  when: sestaus.rc !=0
+
+- name: 'install epel, python bindings for selinux'
+  yum: 'name={{item}} state=present update_cache=yes'
+  with_items:
+    - epel-release
+    - libselinux-python
+    - libsemange-python
+
+# SAMPLE 1
+
+--
+- hosts: webservers
+   vars:
+   http_port: 80
+   max_clients: 200
+   remote_user: root
+   tasks:
+  
+- name: ensure apache is at the latest version
+   yum:
+         name: httpd
+         state: latest
+
+ - name: write the apache config file
+    template:
+         src: /srv/httpd.j2
+         dest: /etc/httpd.conf
+    notify:
+         - restart apache
+
+- name: open firewall port
+  
+   firewalld:
+  
+   service: http
+ 
+   immediate: true
+  
+   permanent: true
+  
+   state: enabled
+
+ - name: ensure apache is running
+    service:
+        name: httpd
+        state: started
+
+   handlers:
+
+ - name: restart apache
+    service:
+        name: httpd
+        state: restarted
+
+
+- name: create web admin group
+  group:
+    name: web
+    state: present
+
+- name: create web admin user
+  user:
+    name: webadm
+    comment: "Web Admin"
+    password: $6$rounds=656000$bp7zTIl.nar2WQPS$U5CBB15GHnzBqnhY0r7UX65FrBI6w/w9YcAL2kN9PpDaYQIDY6Bi.CAEL6PRRKUqe2bJYgsayyh9NOP1kUy4w.
+    groups: web
+    append: yes
+
+- name: set content directory group/permissions 
+  file:
+  path: /var/www/html
+  owner: root
+  group: web
+  state: directory
+  mode: u=rwx,g=rwx,o=rx,g+s
+
+- name: create default page content
+  copy:
+  content: "Welcome to {{ ansible_fqdn}} on {{ ansible_default_ipv4.address}}"
+  dest: /var/www/html/index.html
+  owner: webadm
+  group: web
+  mode: u=rw,g=rw,o=r
+
+- hosts: dbservers
+  become: yes
+  tasks:
+  
+- name: install MariaDB server
+  yum:
+    name: mariadb-server
+    state: latest
+
+- name: enable and start MariaDB server
+  service:
+    name: mariadb
+    enabled: yes
+    state: started
+
+- hosts: logservers
+  become: yes
+  tasks:
+  
+- name: configure rsyslog remote log reception over udp
+  lineinfile:
+  path: /etc/rsyslog.conf
+  line: "{{ item }}"
+  state: present
+  with_items:
+    - '$ModLoad imudp'
+    - '$UDPServerRun 514'
+  notify:
+    - restart rsyslogd
+
+- name: open firewall port
+  firewalld:
+  port: 514/udp
+  immediate: true
+  permanent: true
+  state: enabled
+
+  handlers:
+   
+- name: restart rsyslogd
+  service:
+    name: rsyslog
+    state: restarted
+
+- hosts: lamp
+  become: yes
+  tasks:
+  
+- name: configure rsyslog
+  lineinfile:
+  path: /etc/rsyslog.conf
+  line: '*.* @192.168.102.215:514'
+  state: present
+  notify:
+    - restart rsyslogd
+
+  handlers:
+ 
+- name: restart rsyslogd
+  service:
+    name: rsyslog
+  state: restarted
+
+# SAMPLE 2
+
+---
+- hosts: 192.168.56.101
+  become: true
+  tasks:
+
+- name: install tools  (install multiple tools)
+  yum: 'name={{item}} state=present update_cache=yes'
+  with_items:
+    - python-mysqldb
+
+- name: install mysql-server (install package)
+  yum: name=mysql-server state=present update_cache=yes
+  mysql_db: name=demo state=present
+
+- name: ensure mysql started (start service)
+  service: name=mysql state=present enabled=yes
+
+- name: create demo database  (create file)
+  mysql_db: name=demo state=present
+
+- name: create demo user (create user)
+  mysql_user: 'name=demo password=demo priv=demo.*:ALL host=''%'' state=present'
+
+- name: open firewalld port (open port)
+  command: firewall-cmd --zone=public --permanent --add-port=5666/tcp
+
+  handlers:
+
+- name: restart mysql
+  service:
+    name: mysqld
+    state: restarted
+
+SAMPLE 3
+
+---
+- name: install and start apache
+  hosts: test
+  remote_user: root
+  become: yes
+
+  tasks:
+
+- name: install epel repo
+  yum: name=epel-release state=present
+
+- name: install python bindings for SELinux
+  yum: name={{item}} state=present
+  with_items:
+    - libselinux-python
+    - libsemanage-python
+
+- name: test to see if SELinux is running
+  command: getenforce
+  register: sestatus
+  changed_when: false
+
+- name: install apache
+  yum: name=httpd state=present
+
+- name: start apache
+  service: name=httpd state=started enabled=yes
+
+## DOCKER LECTURE
+
+# CONFIGURATION FILE
+
+1. docker-compose.yml (Docker build configuration file)
+
+2. DockerFile (Docker image assembly commands)
+
+3. docker swarm (Docker Clustering)
+
+Docker is lightweight VM or Container
+
+Docker advantages are
+
+1. Same environment 
+2. Sandbox projects
+3. It just works  
+4. Docker uses the same kernel as the physical OS
+5. Docker has it's own application, binaries and libraries 
+6. Docker is not a full VM 
+7. Container is running instance of an image
+8. Image  is a template of OS 
+9. Image are defined using a docker file
+
+# DOCKER FUNDAMENTALS
+
+Unlike VM, it does not not emulate the hypervisor. 
+
+It has single OS and don't have to install guest OS or emulate hardware 
+
+It boots much faster 
+
+Limited to Linux OS and cannot install Wintel
+
+Provides special format which is good for developers
+
+It works with images and extracts it 
+
+Packages application, binaries and libraries 
+
+Images put together through union filesystem
+
+Images forms a container 
+
+Originally, the containers are not persistent 
+
+Containers are persistent after we mount volumes 
+
+# STARTING DOCKER CONTAINER
+
+docker pull image (download)
+
+docker image (verify download)
+
+docker run -d -ti -v /data --name=test -p 83:80 image (docker configuration)
+
+docker ps -a (confirm running)
+
+docker exec -ti image /bin/bash (access container)
+
+whoami 
+ls /
+top (Shows 2 processes of bash and top commands)
+Ctrl + P + Q (Takes back to host without stopping container)
+ps aux | grep top (Shows top inside the container)
+docker ps  (Shows running containers with container id, image, command, created and status)
+docker attach image_name 
+Ctrl C (Stops the container)
+docker ps -a  (Shows all the containers including those not running)
+docker start image_name (Starts the container)
+docker top image_name (Tells me what is running in the container)
+docker stop image_name (Stops the container)
+cd /var/lib/docker/<container>/ (Shows directory of container)
+ls (Shows all files in the containers)
+docker run -ti image_name /bin/bash (Will pull and start containers)
+docker run -d -ti --name=duck centos /bin/bash (Starts in detach mode with newly assigned image_name)
+docker ps
+docker stop image_name
+
+# PERSISTENT STORAGE FOR DOCKER 
+
+Everything is lost when we stop the container
+
+To make persistent 
+docker run -ti -v /data --name=duck2 centos /bin/bash
+ls (Will see the data directory)
+cd /data 
+touch a b c 1 2 3
+Ctrl + P + Q
+cd /var/lib/docker/volumes/<file>
+ls
+docker attach image_name
+rm c
+docker ps (No container)
+mkdir /srv/duck2
+docker run -ti -v /srv/duck2:/data --name=duck3 centos /bin/bash (Attaches new directory to container)
+ls
+cd data/
+ls
+touch a b c 
+ls
+exit
+ls /srv/duck2
+
+# NETWORK CONNECTIONS TO CONTAINER
+
+docker run -d -p 3306 -ti mysql (Will look for latest mysql image)
+docker ps
+docker run -d -p 3306 -ti mysql /bin/bash
+iptables -L -t nat (Shows local port mapped to 3306)
+iptables -L -t nat (Shows internal IP address also)
+docker stop image_name
+docker run -d -p 3306:3306 -ti mysql /bin/bash (Maps 3306 on local to 3306 on container)
+ip a (Shows docker internal bridge)
+docker run -d -p 192.168.56.101:3306:3306 -ti mysql /bin/bash (Can change the IP address for the container)
+docker attach image_name
+ip addr show (Internal Interface is linked to containers)
+
+# CREATE DOCKERFILE
+
+cat >> Dockerfile
+FROM centos
+
+RUN yum -y install openssh-server
+
+RUN useradd remote_user && \
+          echo "1234" | passwd remote_user --stdin && \
+          mkdir /home/remote_user/.ssh && \
+          chmod 700 /home/remote_user/.ssh
+
+COPY remote-key.pub /home/remote_user/.ssh/authorized_keys
+
+RUN chown remote_user:remote_user -R /home/remote_user/.ssh/ && \
+          chmod 600 /home/remote_user/.ssh/authorized_keys
+
+RUN /usr/sbin/sshd-keygen
+
+RUN yum -y install mysql
+
+RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
+          python get-pip.py && \
+          pip install awscli --upgrade
+
+CMD /usr/sbin/sshd -D
+
+docker build
+
+# CREATE DOCKER COMPOSE
+
+cat >> docker-compose.yml
+version: '3'
+services:
+     jenkins:
+         container_name: jenkins
+         image: jenkins-ansible
+         build:
+              context: jenkins-ansible
+        ports:
+             - "8080:8080"
+        volumes:
+             - "$PWD/jenkins_home:/var/jenkins_home"
+    networks:
+      - net
+    remote_host:
+         container_name: remote-host
+         image: remote-host
+         build:
+             context: centos7
+         volumes:
+              - "$PWD/aws-s3.sh:/tmp/script.sh"
+         networks:
+              - net
+  db_host:
+       container_name: db
+       image: mysql:5.7
+       environment:
+            - "MYSQL_ROOT_PASSWORD=1234"
+       volumes:
+            - "$PWD/db_data:/var/lib/mysql"
+       networks:
+            - net
+  networks:
+       net:
+
+# Build image from docker configuration file
+docker-compose build
+
+# Recreate the images with new settings from DockerFile
+docker-compose  up -d
+
+# Verify images is running 
+docker images 
+docker ps 
+
+# Access the image 
+docker exec -ti mysql bash 
+
+# DOCKER SWARM (CLUSTERING)
+
+# To initialize swarm mode and listen to a specific interface.
+Docker swarm init --advertise-addr 10.1.0.2
+
+# Join an existing swarm as manager node
+Docker swarm join --token<manager-token> 10.1.0.2:2377
+
+# Join a swarm as a worker node
+Docker swarm join --token<worker-token> 10.1.0.2:2377
+
+# List all the nodes in the swarm
+Docker node ls
+
+# Create a service from an image on the existing port and deploy 3 instances
+Docker service create --replicas 3 -p 80:80 name -webngix
+
+# List services running in swarm
+Docker service ls
+
+# Scale a service
+Docker service scale web=5
+
+# List tasks of a service
+Docker service ps web
+
+Clean up
+
+To prevent from wasting the resources, you must know how to clean, we are providing few essential commands for same.
+
+Commands:
+
+# To clean unused/dangling images:
+Docker image prune
+
+# To remove images not used in containers
+Docker image prune -a
+
+# To prune the entire system
+Docker system prune
+
+# To leave a swarm
+Docker swarm leave
+
+# To remove a swarm
+Docker stack rm stack_name
+
+# To kill all running containers
+Docker kill $ (docker ps -q)
+
+# To delete all stopped containers
+docker rm $(docker ps -a -q)
+
+# To delete all images
+docker rmi $(docker images -q)
+
+Services
+Let’s take a sneak peek over the commands used for viewing the running services, run the services, to view all service logs and to scale the services.
+Commands:
+
+# List of all services running in a swarm
+Docker service ls
+
+# To see all running services
+Docker stack services stack_name
+
+# To see all service logs
+Docker service logs stack_name service_names
+
+# To scale service across qualified nodes
+Docker service scale stack_name_service_name= replicas
+
+## KUBERNETES LECTURE
+
+(service, pods, ingress, deployments)
+
+SERVICE (load balancing)
+
+PODS (containers)
+
+INGRESS (Connects to service load balancers)
+
+DEPLOYMENTS (cluster)
+
+STEPS:
+
+Ingress => Service => Deployments => Pods
+
+SERVICES:
+
+KUBEADM (Automation and Installation)
+
+KUBELETS (Services)
+
+KUBECTL (Command tool)
+
+Key concepts
+
+Now let’s discuss the key points of this architecture.
+
+Pod: These are the group of containers.
+
+Labels: These are used to identify the pods.
+
+Kubelet: They are container agents, responsible for maintaining the set of pods.
+
+Proxy: They are the Load balancer for pods, helping in distributing tasks across the pods.
+
+Etcd: A Metadata service.
+
+Cadvisor: For resource usage and performance stats.
+
+Replication controller: It manages pod replication.
+
+Scheduler: Used for pod scheduling in worker nodes.
+
+API server: Kubernetes API server.
+
+Now let’s understand the role Master and Node play in the Kubernetes Architecture.
+
+Go through the Best DevOps Course in New York to get clear understanding of DevOps.
+
+Master
+It is responsible for maintaining the desired state for the cluster you are working on.
+“Master” indicates a set of processes that are used to manage the cluster.
+It contains service info, API, scheduler, replication controllers, and master.
+
+STEPS..
+
+Install Docker and Kubernetes on all servers.
+
+    The first thing that we are going to do is use SSH to log in to all machines. Once we have logged in, we need to elevate privileges using sudo.
+
+    sudo su  
+
+    Disable SELinux.
+
+    setenforce 0
+    sed -i --follow-symlinks 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
+
+    Enable the br_netfilter module for cluster communication.
+
+    modprobe br_netfilter
+    echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
+
+    Ensure that the Docker dependencies are satisfied.
+
+    yum install -y yum-utils device-mapper-persistent-data lvm2
+
+    Add the Docker repo and install Docker.
+
+    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+    yum install -y docker-ce
+
+    Set the cgroup driver for Docker to systemd, then reload systemd, enable and start Docker
+
+    sed -i '/^ExecStart/ s/$/ --exec-opt native.cgroupdriver=systemd/' /usr/lib/systemd/system/docker.service
+    systemctl daemon-reload
+    systemctl enable docker --now
+
+    Add the repo for Kubernetes.
+
+    cat << EOF > /etc/yum.repos.d/kubernetes.repo  
+    [kubernetes]  
+    name=Kubernetes  
+    baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64  
+    enabled=1  
+    gpgcheck=0  
+    repo_gpgcheck=0  
+    gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg  
+     https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg  
+    EOF  
+
+    Install Kubernetes.
+
+    yum install -y kubelet kubeadm kubectl
+
+    Enable the kubelet service. The kubelet service will fail to start until the cluster is initialized, this is expected.
+
+    systemctl enable kubelet
+
+*Note: Complete the following section on the MASTER ONLY!
+
+    Initialize the cluster using the IP range for Flannel.
+
+    kubeadm init --pod-network-cidr=10.244.0.0/16
+
+    Copy the kubeadmin join command that is in the output. We will need this later.
+
+    Exit sudo and copy the admin.conf to your home directory and take ownership.
+
+    mkdir -p $HOME/.kube
+    sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+    sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+    Deploy Flannel.
+
+    kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+    Check the cluster state.
+
+    kubectl get pods --all-namespaces
+
+    Note: Complete the following steps on the NODES ONLY!
+
+    Run the join command that you copied earlier, then check your nodes from the master.
+
+    kubectl get nodes
+
+Create and scale a deployment using kubectl.
+
+    Create a simple deployment.
+
+    kubectl create deployment nginx --image=nginx
+
+    Inspect the pod.
+
+    kubectl get pods
+
+    Scale the deployment.
+
+    kubectl scale deployment nginx --replicas=4
+
+    Inspect the pods. You should now have 4.
+
+    kubectl get pods
+
+## Run the join command that you copied earlier (this command needs to be run as sudo), then check your nodes from the master.
+
+kubectl get nodes
+
+## Cluster Introspection
+
+kubectl get services                # List all services 
+
+kubectl get pods                    # List all pods
+
+kubectl get nodes -w                # Watch nodes continuously
+
+kubectl version                     # Get version information
+
+kubectl cluster-info                # Get cluster information
+
+kubectl config view                 # Get the configuration
+
+kubectl describe node <node>        # Output information about a node
+	
+kubectl get services                # List all services 
+
+kubectl get pods                    # List all pods
+
+kubectl get nodes -w                # Watch nodes continuously
+
+kubectl version                     # Get version information
+
+kubectl cluster-info                # Get cluster information
+
+kubectl config view                 # Get the configuration
+
+kubectl describe node <node>        # Output information about a node
+
+## Pod and Container Introspection
+
+kubectl get pods                         # List the current pods
+
+kubectl describe pod <name>              # Describe pod <name>
+
+kubectl get rc                           # List the replication controllers
+
+kubectl get rc --namespace="<namespace>" # List the replication controllers in <namespace>
+
+kubectl describe rc <name>               # Describe replication controller <name>
+
+kubectl get svc                          # List the services
+
+kubectl describe svc <name>              # Describe service <name>
+	
+kubectl get pods                         # List the current pods
+
+kubectl describe pod <name>              # Describe pod <name>
+
+kubectl get rc                           # List the replication controllers
+
+kubectl get rc --namespace="<namespace>" # List the replication controllers in <namespace>
+
+kubectl describe rc <name>               # Describe replication controller <name>
+
+kubectl get svc                          # List the services
+
+kubectl describe svc <name>              # Describe service <name>
+
+## Interacting with Pods
+
+kubectl run <name> --image=<image-name>                             # Launch a pod called <name> 
+                                                                    # using image <image-name>
+
+kubectl create -f <manifest.yaml>                                   # Create a service described 
+                                                                    # in <manifest.yaml>
+
+kubectl scale --replicas=<count> rc <name>                          # Scale replication controller 
+                                                                    # <name> to <count> instances
+
+kubectl expose rc <name> --port=<external> --target-port=<internal> # Map port <external> to 
+                                                                    # port <internal> on replication 
+                                                                    # controller <name>
+	
+kubectl run <name> --image=<image-name>                             # Launch a pod called <name> 
+                                                                    # using image <image-name>
+ 
+kubectl create -f <manifest.yaml>                                   # Create a service described 
+                                                                    # in <manifest.yaml>
+ 
+kubectl scale --replicas=<count> rc <name>                          # Scale replication controller 
+                                                                    # <name> to <count> instances
+ 
+kubectl expose rc <name> --port=<external> --target-port=<internal> # Map port <external> to 
+                                                                    # port <internal> on replication 
+                                                                    # controller <name>
+
+## Stopping Kubernetes
+
+kubectl delete pod <name>                                         # Delete pod <name>
+
+kubectl delete rc <name>                                          # Delete replication controller <name>
+
+kubectl delete svc <name>                                         # Delete service <name>
+
+kubectl drain <n> --delete-local-data --force --ignore-daemonsets # Stop all pods on <n>
+
+kubectl delete node <name>                                        # Remove <node> from the cluster
+	
+kubectl delete pod <name>                                         # Delete pod <name>
+
+kubectl delete rc <name>                                          # Delete replication controller <name>
+
+kubectl delete svc <name>                                         # Delete service <name>
+
+kubectl drain <n> --delete-local-data --force --ignore-daemonsets # Stop all pods on <n>
+
+kubectl delete node <name>                                        # Remove <node> from the cluster
+
+## Debugging
+
+kubectl exec <service> <command> [-c <$container>] # execute <command> on <service>, optionally 
+                                                   # selecting container <$container>
+
+kubectl logs -f <name> [-c <$container>]           # Get logs from service <name>, optionally
+                                                   # selecting container <$container>
+
+watch -n 2 cat /var/log/kublet.log                 # Watch the Kublet logs
+
+kubectl top node                                   # Show metrics for nodes
+
+kubectl top pod                                    # Show metrics for pods
+	
+kubectl exec <service> <command> [-c <$container>] # execute <command> on <service>, optionally 
+                                                   # selecting container <$container>
+ 
+kubectl logs -f <name> [-c <$container>]           # Get logs from service <name>, optionally
+                                                   # selecting container <$container>
+ 
+watch -n 2 cat /var/log/kublet.log                 # Watch the Kublet logs
+
+kubectl top node                                   # Show metrics for nodes
+
+kubectl top pod                                    # Show metrics for pods
+
+## Administration
+
+kubeadm init                                              # Initialize your master node
+
+kubeadm join --token <token> <master-ip>:<master-port>    # Join a node to your Kubernetes cluster
+
+kubectl create namespace <namespace>                      # Create namespace <name>
+
+kubectl taint nodes --all node-role.kubernetes.io/master- # Allow Kubernetes master nodes to run pods
+
+kubeadm reset                                             # Reset current state
+
+kubectl get secrets                                       # List all secrets
+	
+kubeadm init                                              # Initialize your master node
+
+kubeadm join --token <token> <master-ip>:<master-port>    # Join a node to your Kubernetes cluster
+
+kubectl create namespace <namespace>                      # Create namespace <name>
+
+kubectl taint nodes --all node-role.kubernetes.io/master- # Allow Kubernetes master nodes to run pods
+
+kubeadm reset                                             # Reset current state
+ 
+kubectl get secrets                                       # List all secrets
+
+## GITLAB LECTURE
+
+-Version control system.
+
+-Source code repository.
+
+-Responsible or the ansible inventory list.
+
+-Create and merge requests after local branch completes.
+
+-Always run "git add -A ." from the branch's parent directory.
+
+SPARC (status, pull, push, add, remote, rebase, clone, checkout, commit, branch)
+
+status (Checks status of staged files "git status")
+
+pull (Sync with repo as "git pull")
+
+push (Upload with "git push origin newbranch")
+
+add (Stage with "git add newfile.yml")
+
+remote (Connects with github website after we create account as git remoteadd)
+
+rebase (Catch up commits with remote branch "git rebase production")
+
+clone (Mounts repo as "git clone git@gitserver.xtonet.com:ansible/UnixSolutions.git")
+
+checkout (Changes or creates as "git checkout -b newbranch")
+
+commit (Commits before uploading as git commit -m "This is a test")
+
+branch (Check what branch you are in as "git branch")
+
+USING GIT
+
+1. git config --global user.name "Derek Banas"
+2. git config --global user.email derekbanas@verizon.net
+3. git config --global core.editor "vim" # Set editor as vim
+4. git config --global core.editor "edit -w" # Set editor as Text Wrangler Mac
+5. git config --list # Show settings
+6. git help OR git help [COMMAND] OR git help add
+
+7. ---------------- Track a directory ----------------
+
+a. Go to directory
+b. ls -a shows all files
+c. git init # Creates the .git directory
+
+8. ---------------- Start tracking files ----------------
+a. By type : git add *.java
+b. By name : git add AndroidManifest.xml
+
+9. ---------------- Ignore Files ----------------
+a. Create a .gitignore file
+b. https://github.com/github/gitignore
+
+10. ---------------- git commit -m 'Initial project version'
+a. Commits the changes and sets an abbreviated commit message
+
+11. ---------------- git status ----------------
+a. Shows the state of your files meaning if they are tracked, have been modified and the branch your on.
+
+12. ---------------- Stage A Modified File ----------------
+a. Change the file and save
+b. git diff # Shows what you changed, but haven't staged
+c. git add AndroidManifest.xml # Stage file
+d. git diff --cached # Shows what has been staged, but not committed
+
+13. ---------------- Commit The Changes ----------------
+a. commit # Opens the editor we defined above or vi
+b. In vi click [ESC] i to enter insert mode
+c. Type a heading that briefly explains the changes in 50 characters or less
+d. Describes the original problem that is being addressed
+e. Describes the specific change being made
+f. Describes the result of the change
+g. Describes any future improvements
+h. Post a closes bug notation Closes-Bug: #1291621
+i. Hit [ESC] and type wq to save and exit
+j. git commit -a -m 'Changed comment' # Skips staging and commit message
+
+14. ---------------- Remove a File ----------------
+a. rm DeleteMe.txt # If you remove a file it shows as "Changed but not updated"
+b. git status # If you remove a file it shows as "Changed but not updated"
+c. git rm DeleteMe.txt
+d. git status # Shows that the file was deleted
+e. If you have committed a file to be removed you must add the -f option
+f. git rm --cached DeleteMe.txt # Keep file, but remove from staging area
+g. git mv DeleteMe.txt Delete.txt # Renames a file
+
+15. ---------------- Log Commit History ----------------
+a. git log # Shows all of the previous commit messages in reverse order
+b. git log --pretty=oneline # Shows commits on one line
+c. git log --pretty=format:"%h : %an : %ar : %s"
+I. %h - Abbreviated Hash
+II. %an - Authors Name
+III. %ar - Date Changed
+IV. %s - First Line of Comment
+d. git log -p -2 # Shows the last 2 commit changes
+e. git log --stat # Prints abbreviated stats
+f. git log --since=1.weeks # Show only changes in the last week
+g. git log --since="2014-04-12" # Show changes since this date
+h. git log --author="Derek Banas" # Changes made by author
+i. git log --before="2014-04-13" # Changes made before this date
+
+16. ---------------- Undoing a Commit ----------------
+a. git commit --amend # If you want to change your previous commit
+b. Normally done if you forgot to stage a file, or to change the commit message
+
+17. ---------------- Unstage a File ----------------
+a. git reset HEAD AndroidManifest.xml
