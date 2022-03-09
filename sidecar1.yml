@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: big-corp-app
+spec:
+  containers:
+  - name: big-corp-app
+    image: busybox
+    args: [/bin/sh, -c, 'tail -n+1 -f /var/log/big-corp-app.log']
+    volumeMounts:
+    - name: logs
+      mountPath: /var/log
+  volumes:
+  - name: logs
+    emptyDir: {}

@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: httpenv
+  name: httpenv
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpenv
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: httpenv
+    spec:
+      containers:
+      - image: bretfisher/httpenv
+        name: httpenv
+        resources: {}
+status: {}

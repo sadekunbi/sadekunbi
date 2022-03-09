@@ -1,0 +1,30 @@
+version: "3.7"
+
+services:
+  worker:
+    image: xinfengliu/iod-worker
+    # command: ["-D"] # debug logging mode
+    deploy:
+      mode: global
+    networks:
+      - bridge # must use bridge network
+    ports:
+      - published: 50051
+        target: 50051
+        mode: host  # must use host mode
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  manager:
+    image: xinfengliu/iod-manager
+    # command: ["-D", "-interval=60", "-worker_port=50051"] # default 'interval=600' seconds, worker_port=50051
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+      replicas: 1
+    networks:
+      - bridge
+    volumes:
+      - /var/run/docker/swarm/control.sock:/var/run/docker/swarm/control.sock
+networks:
+  bridge:
+    external: true

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-test
+spec:
+  containers:
+  - image: nginx
+  name: myfrontend
+  image: nginx
+  volumeMounts:
+    - mountPath: "/var/app/config"
+  name: mypd
+volumes:
+- name: mypd
+persistentVolumeClaim:
+  claimName: pvc-test
